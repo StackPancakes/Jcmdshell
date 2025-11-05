@@ -1,0 +1,1 @@
+java --enable-native-access=ALL-UNNAMED -jar ..\target\Jcmdshell.jar -e "show ..\README.md"

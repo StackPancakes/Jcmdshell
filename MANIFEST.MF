@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+Created-By: StackPancakes
+Main-Class: xyz.stackpancakes.Main
+Class-Path: lib/jline-3.30.6.jar
+Sealed: true
+Specification-Title: Jcmdshell
+Specification-Version: 0.1.0
+Specification-Vendor: StackPancakes
+Implementation-Title: Jcmdshell
+Implementation-Version: 0.1.0
+Implementation-Vendor: StackPancakes
