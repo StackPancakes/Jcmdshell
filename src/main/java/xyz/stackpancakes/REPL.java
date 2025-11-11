@@ -219,7 +219,7 @@ public final class REPL
         for (String dir : pathDirs)
         {
             Path candidate = Paths.get(dir, command);
-            if (Files.exists(candidate) && Files.isRegularFile(candidate) && FileSystemUtils.isExecutable(candidate))
+            if (Files.exists(candidate) && FileSystemUtils.isExecutable(candidate))
                 return Optional.of(candidate);
             if (isWindows)
             {
@@ -229,7 +229,7 @@ public final class REPL
                     for (String ext : extensions)
                     {
                         Path candidateWithExt = Paths.get(dir, command + ext);
-                        if (Files.exists(candidateWithExt) && Files.isRegularFile(candidateWithExt) && FileSystemUtils.isExecutable(candidateWithExt))
+                        if (Files.exists(candidateWithExt) && FileSystemUtils.isExecutable(candidateWithExt))
                             return Optional.of(candidateWithExt);
                     }
                 }
