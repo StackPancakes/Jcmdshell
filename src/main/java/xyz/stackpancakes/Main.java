@@ -331,7 +331,7 @@ public final class Main
 
     private static void usage()
     {
-        PrinterUtils.printFormatted("usage: jcmdshell [(-e <command> | -e=<command> | --EXECUTE <command>)]", System.err);
+        PrinterUtils.printFormatted(Ansi.withForeground("Usage", Ansi.Foreground.RED) + ": Jcmdshell [(-e <command> | -e=<command> | --EXECUTE <command>)]", System.err);
         System.exit(2);
     }
 }
