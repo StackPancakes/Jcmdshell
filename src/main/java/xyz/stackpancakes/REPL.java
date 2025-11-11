@@ -114,7 +114,11 @@ public final class REPL
             }
         }
 
-        ReservedWords word = ReservedWords.fromString(parsed.command());
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        boolean isWindows = os.contains("win");
+
+        String lookup = isWindows ? parsed.command().toUpperCase(Locale.ROOT) : parsed.command();
+        ReservedWords word = ReservedWords.fromString(lookup);
         Function<List<String>, CommandResult> cmd = commands.get(word);
         if (cmd != null)
         {
@@ -147,11 +151,17 @@ public final class REPL
         String[] parts = input.trim().split("\\s+", 2);
         String cmd = parts[0];
         String argsStr = parts.length > 1 ? parts[1] : "";
-        if (!isPathLike(cmd))
+
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        boolean isWindows = os.contains("win");
+
+        if (isWindows && !isPathLike(cmd))
             cmd = cmd.toUpperCase(Locale.ROOT);
+
         List<String> args = splitQuotedArgs(argsStr);
         return new ParsedCommand(cmd, args);
     }
+
 
     private List<String> splitQuotedArgs(String inputStr)
     {
