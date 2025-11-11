@@ -19,7 +19,7 @@ public class FileSystemUtils
 
     public static boolean isExecutable(Path entry)
     {
-        if (entry == null || !Files.isRegularFile(entry))
+        if (entry == null || !Files.exists(entry))
             return false;
         try
         {
@@ -152,24 +152,52 @@ public class FileSystemUtils
             try
             {
                 OutputStream procIn = process.getOutputStream();
+                InputStream userIn = System.in;
                 byte[] buf = new byte[8192];
-                int n;
-                while (process.isAlive() && (n = System.in.read(buf)) != -1)
+
+                while (process.isAlive())
                 {
-                    procIn.write(buf, 0, n);
-                    procIn.flush();
+                    int available;
+                    try
+                    {
+                        available = userIn.available();
+                    }
+                    catch (IOException _)
+                    {
+                        available = 0;
+                    }
+
+                    if (available > 0)
+                    {
+                        int toRead = Math.min(buf.length, available);
+                        int n = userIn.read(buf, 0, toRead);
+                        if (n == -1)
+                            break;
+                        procIn.write(buf, 0, n);
+                        procIn.flush();
+                    }
+                    else
+                    {
+                        try
+                        {
+                            Thread.sleep(10);
+                        }
+                        catch (InterruptedException _)
+                        {
+                            break;
+                        }
+                    }
                 }
+
                 try
                 {
                     procIn.close();
                 }
                 catch (IOException _)
-                {
-                }
+                {}
             }
             catch (IOException _)
-            {
-            }
+            {}
         }, "io-in");
     }
 
