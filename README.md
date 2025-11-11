@@ -75,6 +75,14 @@ javac -cp "lib/*" -d target $(find src/main/java/xyz/stackpancakes -name "*.java
 `target/` act as compilation output directories.
 > On Unix-like systems, a POSIX-compatible `sh` is assumed to be available.
 
+
+## Running with Nix
+
+If you have [Nix](https://nixos.org/) installed, you can build and run Jcmdshell without manually managing Java or Maven dependencies:
+```sh
+nix run github:StackPancakes/Jcmdshell
+```
+
 ---
 
 # Packaging a Standard JAR
