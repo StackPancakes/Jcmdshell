@@ -138,7 +138,7 @@ public final class FunctionCommands
     }
     public static CommandResult printCommand(List<String> args)
     {
-        OutputPrinter.setLastOutput(String.join(" ", args));
+        OutputPrinter.setLastOutput(String.join(" ", args) + System.lineSeparator());
         return CommandResult.Success;
     }
     public static CommandResult MCDCommand(List<String> args)
