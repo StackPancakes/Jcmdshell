@@ -129,8 +129,7 @@ public class FileSystemUtils
                 handle(stdoutCapture, cs, terminalWriter, in);
             }
             catch (IOException _)
-            {
-            }
+            {}
         });
     }
 
