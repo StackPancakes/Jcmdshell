@@ -65,7 +65,7 @@ public class FileSystemUtils
         builder.directory(CurrentDirectory.get().toFile());
 
         builder.redirectInput(ProcessBuilder.Redirect.INHERIT);
-        builder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+        builder.redirectOutput(ProcessBuilder.Redirect.PIPE);
 
         try
         {
