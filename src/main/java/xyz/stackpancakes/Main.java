@@ -205,6 +205,7 @@ public final class Main
 
         Terminal terminal = TerminalBuilder.builder()
                 .system(true)
+                .jna(true)
                 .build();
 
         TerminalShare.setSharedTerminal(terminal);
