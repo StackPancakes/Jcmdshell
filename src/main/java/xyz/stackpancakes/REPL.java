@@ -13,6 +13,7 @@ import java.io.PrintStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -364,10 +365,9 @@ public final class REPL
                     Files.write(outputFile, data);
             }
             else
-            {
                 if (data.length > 0)
-                    System.out.write(data);
-            }
+                    IO.print(new String(data, Charset.defaultCharset()));
+
 
             return true;
         }
