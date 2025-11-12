@@ -3,6 +3,7 @@ package xyz.stackpancakes.shell.util;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -75,9 +76,10 @@ public class FileSystemUtils
             process = builder.start();
             currentProcess.set(process);
 
-            Thread outThread = getOutThread(process, stdoutCapture, cs);
+            Writer terminalWriter = TerminalShare.getSharedTerminal().writer();
 
-            Thread errThread = getThread(process, stderrCapture, cs);
+            Thread outThread = getOutThread(process, stdoutCapture, cs, terminalWriter);
+            Thread errThread = getErrThread(process, stderrCapture, cs, terminalWriter);
 
             outThread.start();
             errThread.start();
@@ -117,21 +119,14 @@ public class FileSystemUtils
         }
     }
 
-    private static Thread getOutThread(Process process, ByteArrayOutputStream stdoutCapture, Charset cs)
+    private static Thread getOutThread(Process process, ByteArrayOutputStream stdoutCapture, Charset cs, Writer terminalWriter)
     {
         return new Thread(() ->
         {
             try
             {
                 InputStream in = process.getInputStream();
-                byte[] buf = new byte[8192];
-                int n;
-                while ((n = in.read(buf)) != -1)
-                {
-                    stdoutCapture.write(buf, 0, n);
-                    System.out.print(new String(buf, 0, n, cs));
-                    System.out.flush();
-                }
+                handle(stdoutCapture, cs, terminalWriter, in);
             }
             catch (IOException _)
             {
@@ -139,25 +134,30 @@ public class FileSystemUtils
         });
     }
 
-    private static Thread getThread(Process process, ByteArrayOutputStream stderrCapture, Charset cs)
+    private static void handle(ByteArrayOutputStream stdoutCapture, Charset cs, Writer terminalWriter, InputStream in) throws IOException
+    {
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) != -1)
+        {
+            stdoutCapture.write(buf, 0, n);
+            String text = new String(buf, 0, n, cs);
+            terminalWriter.write(text);
+            terminalWriter.flush();
+        }
+    }
+
+    private static Thread getErrThread(Process process, ByteArrayOutputStream stderrCapture, Charset cs, Writer terminalWriter)
     {
         return new Thread(() ->
         {
             try
             {
                 InputStream err = process.getErrorStream();
-                byte[] buf = new byte[8192];
-                int n;
-                while ((n = err.read(buf)) != -1)
-                {
-                    stderrCapture.write(buf, 0, n);
-                    System.err.print(new String(buf, 0, n, cs));
-                    System.err.flush();
-                }
+                handle(stderrCapture, cs, terminalWriter, err);
             }
             catch (IOException _)
-            {
-            }
+            {}
         });
     }
 
