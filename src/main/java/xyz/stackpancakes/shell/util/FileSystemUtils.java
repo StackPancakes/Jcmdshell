@@ -1,12 +1,16 @@
 package xyz.stackpancakes.shell.util;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
@@ -26,6 +30,7 @@ public class FileSystemUtils
     {
         if (entry == null || !Files.exists(entry))
             return false;
+
         try
         {
             String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
@@ -38,7 +43,7 @@ public class FileSystemUtils
             else
                 return Files.isExecutable(entry);
         }
-        catch (Exception e)
+        catch (Exception _)
         {
             return false;
         }
@@ -63,9 +68,9 @@ public class FileSystemUtils
 
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(CurrentDirectory.get().toFile());
-
         builder.redirectInput(ProcessBuilder.Redirect.INHERIT);
-        builder.redirectError(ProcessBuilder.Redirect.INHERIT);
+
+        setupColorFriendlyEnv(builder);
 
         try
         {
@@ -79,19 +84,14 @@ public class FileSystemUtils
 
             Thread outThread = getOutThread(process.getInputStream(), System.out, outputCapture, ansiOk);
             outThread.start();
+
             Thread errThread = getOutThread(process.getErrorStream(), System.err, errorCapture, ansiOk);
             errThread.start();
 
             int exitCode = process.waitFor();
 
-            try
-            {
-                outThread.join(200);
-                errThread.join(200);
-            }
-            catch (InterruptedException _)
-            {
-            }
+            try { outThread.join(200); } catch (InterruptedException _) {}
+            try { errThread.join(200); } catch (InterruptedException _) {}
 
             OutputPrinter.setLastOutput(outputCapture.toString());
             ErrorPrinter.setLastError(errorCapture.toString());
@@ -112,46 +112,52 @@ public class FileSystemUtils
     static boolean returnCode(int exitCode, int consoleWidth)
     {
         boolean isSuccess = exitCode == 0;
+        int spaces = consoleWidth - 2;
+        if (spaces < 0)
+            spaces = 0;
+
         if (isSuccess)
-            System.out.println(" ".repeat(consoleWidth - 2) + Ansi.withForeground(":)", Ansi.Foreground.GREEN));
+            System.out.println(" ".repeat(spaces) + Ansi.withForeground(":)", Ansi.Foreground.GREEN));
         else
-            System.out.println(" ".repeat(consoleWidth - 2) + Ansi.withForeground(":(", Ansi.Foreground.RED));
+            System.out.println(" ".repeat(spaces) + Ansi.withForeground(":(", Ansi.Foreground.RED));
+
         return isSuccess;
     }
 
     private static Thread getOutThread(InputStream in, PrintStream console, ByteArrayOutputStream capture, boolean ansiOk)
     {
-        return new Thread(() ->
-        {
-            byte[] buf = new byte[8192];
-            int n;
-            Charset cs = Charset.defaultCharset();
-            try
-            {
-                while ((n = in.read(buf)) != -1)
+        return new Thread(
+                () ->
                 {
-                    capture.write(buf, 0, n);
+                    byte[] buf = new byte[8192];
+                    int n;
+                    Charset cs = Charset.defaultCharset();
 
-                    if (console != null)
+                    try
                     {
-                        if (ansiOk)
+                        while ((n = in.read(buf)) != -1)
                         {
-                            console.write(buf, 0, n);
+                            capture.write(buf, 0, n);
+
+                            if (console != null)
+                            {
+                                if (ansiOk)
+                                    console.write(buf, 0, n);
+                                else
+                                {
+                                    String chunk = new String(buf, 0, n, cs);
+                                    String cleaned = stripAnsi(chunk);
+                                    console.print(cleaned);
+                                }
+                                console.flush();
+                            }
                         }
-                        else
-                        {
-                            String chunk = new String(buf, 0, n, cs);
-                            String cleaned = stripAnsi(chunk);
-                            console.print(cleaned);
-                        }
-                        console.flush();
                     }
-                }
-            }
-            catch (IOException _)
-            {
-            }
-        }, "io-out");
+                    catch (IOException _)
+                    {}
+                },
+                "io-out"
+        );
     }
 
     private static int getConsoleWidth()
@@ -172,36 +178,37 @@ public class FileSystemUtils
 
     private static boolean supportsAnsi()
     {
-        String term = System.getenv("TERM");
         String noColor = System.getenv("NO_COLOR");
-        String wt = System.getenv("WT_SESSION");
-        String ansicon = System.getenv("ANSICON");
-        String conemu = System.getenv("ConEmuANSI");
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-
-        if ("dumb".equalsIgnoreCase(term))
-            return false;
-
         if (noColor != null && !noColor.isEmpty())
             return false;
 
-        if (!os.contains("win"))
-            return term != null && !term.isEmpty();
-
-        if (wt != null && !wt.isEmpty())
-            return true;
-
-        if (ansicon != null && !ansicon.isEmpty())
-            return true;
-
-        return "ON".equalsIgnoreCase(conemu);
+        try
+        {
+            return TerminalShare.getSharedTerminal() != null;
+        }
+        catch (Exception _)
+        {
+            return System.console() != null;
+        }
     }
 
+    private static void setupColorFriendlyEnv(ProcessBuilder builder)
+    {
+        Map<String, String> env = builder.environment();
+
+        String term = env.get("TERM");
+        if (term == null || term.isEmpty() || "dumb".equalsIgnoreCase(term))
+            env.put("TERM", "xterm-256color");
+
+        env.putIfAbsent("CLICOLOR_FORCE", "1");
+        env.putIfAbsent("FORCE_COLOR", "1");
+    }
 
     private static String stripAnsi(String s)
     {
         if (s == null || s.isEmpty())
             return s;
+
         return ANSI_PATTERN.matcher(s).replaceAll("");
     }
 }
