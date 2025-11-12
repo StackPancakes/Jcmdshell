@@ -64,7 +64,8 @@ public class FileSystemUtils
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(CurrentDirectory.get().toFile());
 
-        builder.redirectInput(ProcessBuilder.Redirect.PIPE);
+        builder.redirectInput(ProcessBuilder.Redirect.INHERIT);
+        builder.redirectOutput(ProcessBuilder.Redirect.PIPE);
 
         try
         {
