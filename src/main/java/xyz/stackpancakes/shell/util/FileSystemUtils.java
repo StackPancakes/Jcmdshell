@@ -60,11 +60,12 @@ public class FileSystemUtils
         List<String> command = new ArrayList<>();
         command.add(path.toAbsolutePath().toString());
         command.addAll(args);
+
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(CurrentDirectory.get().toFile());
+
         builder.redirectInput(ProcessBuilder.Redirect.INHERIT);
-        builder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
-        builder.redirectError(ProcessBuilder.Redirect.INHERIT);
+
         try
         {
             Process process = builder.start();
@@ -75,8 +76,6 @@ public class FileSystemUtils
 
             boolean ansiOk = supportsAnsi();
 
-            Thread inThread = getInThread(process);
-            inThread.start();
             Thread outThread = getOutThread(process.getInputStream(), System.out, outputCapture, ansiOk);
             outThread.start();
             Thread errThread = getOutThread(process.getErrorStream(), System.err, errorCapture, ansiOk);
@@ -86,21 +85,12 @@ public class FileSystemUtils
 
             try
             {
-                process.getOutputStream().close();
-            }
-            catch (IOException _) {}
-            try
-            {
-                inThread.interrupt();
-                inThread.join(200);
-            }
-            catch (InterruptedException _) {}
-            try
-            {
                 outThread.join(200);
                 errThread.join(200);
             }
-            catch (InterruptedException _) {}
+            catch (InterruptedException _)
+            {
+            }
 
             OutputPrinter.setLastOutput(outputCapture.toString());
             ErrorPrinter.setLastError(errorCapture.toString());
@@ -163,71 +153,19 @@ public class FileSystemUtils
         }, "io-out");
     }
 
-    private static Thread getInThread(Process process)
-    {
-        return new Thread(() ->
-        {
-            try
-            {
-                OutputStream procIn = process.getOutputStream();
-                InputStream userIn = System.in;
-                byte[] buf = new byte[8192];
-
-                while (process.isAlive())
-                {
-                    int available;
-                    try
-                    {
-                        available = userIn.available();
-                    }
-                    catch (IOException _)
-                    {
-                        available = 0;
-                    }
-
-                    if (available > 0)
-                    {
-                        int toRead = Math.min(buf.length, available);
-                        int n = userIn.read(buf, 0, toRead);
-                        if (n == -1)
-                            break;
-                        procIn.write(buf, 0, n);
-                        procIn.flush();
-                    }
-                    else
-                    {
-                        try
-                        {
-                            Thread.sleep(10);
-                        }
-                        catch (InterruptedException _)
-                        {
-                            break;
-                        }
-                    }
-                }
-
-                try
-                {
-                    procIn.close();
-                }
-                catch (IOException _)
-                {}
-            }
-            catch (IOException _)
-            {}
-        }, "io-in");
-    }
-
     private static int getConsoleWidth()
     {
-        int width = 0;
+        int width = 80;
+
         try
         {
-            width = TerminalShare.getSharedTerminal().getWidth();
-            return width > 0 ? width : 80;
+            int w = TerminalShare.getSharedTerminal().getWidth();
+            if (w > 0)
+                width = w;
         }
-        catch (Exception _) {}
+        catch (Exception _)
+        {}
+
         return width;
     }
 
