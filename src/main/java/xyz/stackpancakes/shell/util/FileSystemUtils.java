@@ -185,7 +185,7 @@ public class FileSystemUtils
             return false;
 
         if (!os.contains("win"))
-            return System.console() != null;
+            return term != null && !term.isEmpty();
 
         if (wt != null && !wt.isEmpty())
             return true;
@@ -195,6 +195,7 @@ public class FileSystemUtils
 
         return "ON".equalsIgnoreCase(conemu);
     }
+
 
     private static String stripAnsi(String s)
     {
