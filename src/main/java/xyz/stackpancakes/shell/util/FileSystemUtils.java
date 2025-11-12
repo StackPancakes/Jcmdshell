@@ -3,7 +3,6 @@ package xyz.stackpancakes.shell.util;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -69,6 +68,7 @@ public class FileSystemUtils
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(CurrentDirectory.get().toFile());
         builder.redirectInput(ProcessBuilder.Redirect.INHERIT);
+        builder.redirectErrorStream(true);
 
         setupColorFriendlyEnv(builder);
 
@@ -78,23 +78,37 @@ public class FileSystemUtils
             currentProcess.set(process);
 
             ByteArrayOutputStream outputCapture = new ByteArrayOutputStream();
-            ByteArrayOutputStream errorCapture = new ByteArrayOutputStream();
-
             boolean ansiOk = supportsAnsi();
+            InputStream in = process.getInputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            Charset cs = Charset.defaultCharset();
 
-            Thread outThread = getOutThread(process.getInputStream(), System.out, outputCapture, ansiOk);
-            outThread.start();
+            while ((n = in.read(buf)) != -1)
+            {
+                outputCapture.write(buf, 0, n);
 
-            Thread errThread = getOutThread(process.getErrorStream(), System.err, errorCapture, ansiOk);
-            errThread.start();
+                if (ansiOk)
+                {
+                    System.out.write(buf, 0, n);
+                }
+                else
+                {
+                    String chunk = new String(buf, 0, n, cs);
+                    String cleaned = stripAnsi(chunk);
+                    System.out.print(cleaned);
+                }
+                System.out.flush();
+            }
 
             int exitCode = process.waitFor();
 
-            try { outThread.join(200); } catch (InterruptedException _) {}
-            try { errThread.join(200); } catch (InterruptedException _) {}
-
-            OutputPrinter.setLastOutput(outputCapture.toString());
-            ErrorPrinter.setLastError(errorCapture.toString());
+            String captured = outputCapture.toString();
+            OutputPrinter.setLastOutput(captured);
+            if (exitCode != 0)
+                ErrorPrinter.setLastError(captured);
+            else
+                ErrorPrinter.setLastError("");
 
             return returnCode(exitCode, getConsoleWidth());
         }
@@ -122,42 +136,6 @@ public class FileSystemUtils
             System.out.println(" ".repeat(spaces) + Ansi.withForeground(":(", Ansi.Foreground.RED));
 
         return isSuccess;
-    }
-
-    private static Thread getOutThread(InputStream in, PrintStream console, ByteArrayOutputStream capture, boolean ansiOk)
-    {
-        return new Thread(
-                () ->
-                {
-                    byte[] buf = new byte[8192];
-                    int n;
-                    Charset cs = Charset.defaultCharset();
-
-                    try
-                    {
-                        while ((n = in.read(buf)) != -1)
-                        {
-                            capture.write(buf, 0, n);
-
-                            if (console != null)
-                            {
-                                if (ansiOk)
-                                    console.write(buf, 0, n);
-                                else
-                                {
-                                    String chunk = new String(buf, 0, n, cs);
-                                    String cleaned = stripAnsi(chunk);
-                                    console.print(cleaned);
-                                }
-                                console.flush();
-                            }
-                        }
-                    }
-                    catch (IOException _)
-                    {}
-                },
-                "io-out"
-        );
     }
 
     private static int getConsoleWidth()
