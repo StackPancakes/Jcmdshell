@@ -63,32 +63,42 @@ public class FileSystemUtils
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(CurrentDirectory.get().toFile());
         builder.redirectInput(ProcessBuilder.Redirect.INHERIT);
-        builder.redirectErrorStream(true);
+
+        Process process = null;
+
+        ByteArrayOutputStream stdoutCapture = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderrCapture = new ByteArrayOutputStream();
+        Charset cs = Charset.defaultCharset();
 
         try
         {
-            Process process = builder.start();
+            process = builder.start();
             currentProcess.set(process);
 
-            ByteArrayOutputStream outputCapture = new ByteArrayOutputStream();
-            InputStream in = process.getInputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            Charset cs = Charset.defaultCharset();
+            Thread outThread = getOutThread(process, stdoutCapture, cs);
 
-            while ((n = in.read(buf)) != -1)
-            {
-                outputCapture.write(buf, 0, n);
-                System.out.print(new String(buf, 0, n, cs));
-                System.out.flush();
-            }
+            Thread errThread = getThread(process, stderrCapture, cs);
+
+            outThread.start();
+            errThread.start();
 
             int exitCode = process.waitFor();
 
-            String captured = outputCapture.toString();
+            outThread.join();
+            errThread.join();
+
+            String stdout = stdoutCapture.toString(cs);
+            String stderr = stderrCapture.toString(cs);
+            String captured = stdout + stderr;
+
             OutputPrinter.setLastOutput(captured);
             if (exitCode != 0)
-                ErrorPrinter.setLastError(captured);
+            {
+                if (!stderr.isEmpty())
+                    ErrorPrinter.setLastError(stderr);
+                else
+                    ErrorPrinter.setLastError(captured);
+            }
             else
                 ErrorPrinter.setLastError("");
 
@@ -102,7 +112,53 @@ public class FileSystemUtils
         finally
         {
             currentProcess.set(null);
+            if (process != null && process.isAlive())
+                process.destroy();
         }
+    }
+
+    private static Thread getOutThread(Process process, ByteArrayOutputStream stdoutCapture, Charset cs)
+    {
+        return new Thread(() ->
+        {
+            try
+            {
+                InputStream in = process.getInputStream();
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) != -1)
+                {
+                    stdoutCapture.write(buf, 0, n);
+                    System.out.print(new String(buf, 0, n, cs));
+                    System.out.flush();
+                }
+            }
+            catch (IOException _)
+            {
+            }
+        });
+    }
+
+    private static Thread getThread(Process process, ByteArrayOutputStream stderrCapture, Charset cs)
+    {
+        return new Thread(() ->
+        {
+            try
+            {
+                InputStream err = process.getErrorStream();
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = err.read(buf)) != -1)
+                {
+                    stderrCapture.write(buf, 0, n);
+                    System.err.print(new String(buf, 0, n, cs));
+                    System.err.flush();
+                }
+            }
+            catch (IOException _)
+            {
+            }
+        });
     }
 
     static boolean returnCode(int exitCode, int consoleWidth)
@@ -131,7 +187,8 @@ public class FileSystemUtils
                 width = w;
         }
         catch (Exception _)
-        {}
+        {
+        }
 
         return width;
     }
