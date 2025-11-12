@@ -3,6 +3,7 @@ package xyz.stackpancakes.shell.util;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -31,10 +32,7 @@ public class FileSystemUtils
             if (isWindows)
             {
                 String fileName = entry.getFileName().toString().toLowerCase(Locale.ROOT);
-                return fileName.endsWith(".exe")
-                        || fileName.endsWith(".bat")
-                        || fileName.endsWith(".com")
-                        || fileName.endsWith(".cmd");
+                return fileName.endsWith(".exe") || fileName.endsWith(".bat") || fileName.endsWith(".com") || fileName.endsWith(".cmd");
             }
             else
                 return Files.isExecutable(entry);
@@ -65,7 +63,7 @@ public class FileSystemUtils
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(CurrentDirectory.get().toFile());
         builder.redirectInput(ProcessBuilder.Redirect.INHERIT);
-        builder.redirectErrorStream(true);
+        builder.redirectInput(ProcessBuilder.Redirect.PIPE);
 
         try
         {
@@ -76,11 +74,12 @@ public class FileSystemUtils
             InputStream in = process.getInputStream();
             byte[] buf = new byte[8192];
             int n;
+            Charset cs = Charset.defaultCharset();
 
             while ((n = in.read(buf)) != -1)
             {
                 outputCapture.write(buf, 0, n);
-                System.out.write(buf, 0, n);
+                System.out.print(new String(buf, 0, n, cs));
                 System.out.flush();
             }
 
@@ -89,11 +88,11 @@ public class FileSystemUtils
             String captured = outputCapture.toString();
             OutputPrinter.setLastOutput(captured);
             if (exitCode != 0)
-                ErrorPrinter.setLastError("Error: external command exited with code " + exitCode);
+                ErrorPrinter.setLastError(captured);
             else
                 ErrorPrinter.setLastError("");
 
-            return exitCode == 0;
+            return returnCode(exitCode, getConsoleWidth());
         }
         catch (IOException | InterruptedException e)
         {
@@ -104,5 +103,36 @@ public class FileSystemUtils
         {
             currentProcess.set(null);
         }
+    }
+
+    static boolean returnCode(int exitCode, int consoleWidth)
+    {
+        boolean isSuccess = exitCode == 0;
+        int spaces = consoleWidth - 2;
+        if (spaces < 0)
+            spaces = 0;
+
+        if (isSuccess)
+            System.out.println(" ".repeat(spaces) + Ansi.withForeground(":)", Ansi.Foreground.GREEN));
+        else
+            System.out.println(" ".repeat(spaces) + Ansi.withForeground(":(", Ansi.Foreground.RED));
+
+        return isSuccess;
+    }
+
+    private static int getConsoleWidth()
+    {
+        int width = 80;
+
+        try
+        {
+            int w = TerminalShare.getSharedTerminal().getWidth();
+            if (w > 0)
+                width = w;
+        }
+        catch (Exception _)
+        {}
+
+        return width;
     }
 }
