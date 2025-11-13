@@ -65,6 +65,10 @@ public class FileSystemUtils
         builder.directory(CurrentDirectory.get().toFile());
         builder.redirectInput(ProcessBuilder.Redirect.INHERIT);
 
+        builder.environment().putIfAbsent("TERM", "xterm-256color");
+        builder.environment().put("CLICOLOR_FORCE", "1");
+        builder.environment().put("FORCE_COLOR", "1");
+
         Process process = null;
 
         ByteArrayOutputStream stdoutCapture = new ByteArrayOutputStream();
